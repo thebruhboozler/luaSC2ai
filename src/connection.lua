@@ -3,7 +3,7 @@ local websocket = require "http.websocket"
 local pb = require "pb"
 local protoc = require "protoc"
 local debugger = require "src/debug"
-local timeout = 60
+local timeout = 10 
 
 
 --!NOTE: src is need since this going to be running from root directory

@@ -14,4 +14,4 @@ local effectId = {
 	LURKERMP = 12,
 }
 
-return effectIds
+return effectId
