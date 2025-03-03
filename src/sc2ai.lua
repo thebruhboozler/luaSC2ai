@@ -135,34 +135,27 @@ function sc2ai:orderMove(unitTag , orderTarget, queueOrder)
 	end
 	assert(tagExists , "No unit found with tag of " .. unitTag)
 
-	local moveOrderRequest = {
-		actions = {
-			action = {
-				action_raw={
-					unit_command = {
-						abuility_id = ids.abilities.MOVE_MOVE,
-						unit_tags = { unitTag }
-					}
-				}
+	local action = {
+		action_raw = {
+			unit_command = {
+				ability_id = ids.abilities.MOVE_MOVE,
+				unit_tags = {unitTag},
+				queue_command=queueOrder
 			}
 		}
 	}
 
-	if orderTarget.coords ~= nil then 
-		assert(type(orderTarget.coords) == "table" , "Expected table - got: " .. type(orderTarget.coords))
-		moveOrderRequest.actions.action.action_raw.unit_command["target_world_space_pos"] = orderTarget.coords
-	elseif orderTarget.unitTag ~= nil then 
-		assert(type(orderTarget.unitTag) == "number" , "Expected number - got: " .. type(orderTarget.unitTag))
-		moveOrderRequest.actions.action.action_raw.unit_command["target_unit_tag"] = orderTarget.unitTag
+	if type(orderTarget) == "table" then
+		action.action_raw.unit_command.target_world_space_pos = orderTarget
+	elseif type(orderTarget) == "number" then 
+		action.action_raw.unit_command.target_unit_tag = orderTarget
 	else
-		error("orderTarget must have either coords (x,y,z) or unitTag")
+		error("orderTarget must be either an unit tag or a point in the world given as a table {x , y} ")
 	end
 
-	if queueOrder then
-		moveOrderRequest.actions.action.action_raw.unit_command.queue_command = queueOrder
-	end
+	local moveOrderRequest = {actions = {action}}
 
-	debugger:dumpTable(self.connection:send(moveOrderRequest, "action"))
+	debugger:dumpTable(self.connection:send(moveOrderRequest,"action"))
 end
 
 return sc2ai
