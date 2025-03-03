@@ -73,8 +73,7 @@ function sc2ai:createGame(mapPath, enemyRace ,autoJoin , disableFog , randomSeed
 	if randomSeed ~= nil then createGameRequest["random_seed"] = randomSeed end
 	createGameRequest["realtime"] = realtime
 
-	self.connection:send(createGameRequest,"create_game")
-
+	print(debugger:dumpTable(self.connection:send(createGameRequest,"create_game")))
 	if autoJoin then
 		self:joinGame()
 	end
@@ -86,15 +85,16 @@ function sc2ai:joinGame()
 		options = { raw = true },
 		player_name = self.name
 	}
-	self.connection:send(joinGameRequest , "join_game")
+	print(debugger:dumpTable(self.connection:send(joinGameRequest , "join_game")))
 end
 
 
 function sc2ai:getGameState()
-	local gameState = self.connection:send({}, "obeservation")
-	print(debugger:dump(gameState))
+	local gameState = self.connection:send({}, "observation")
+	print(debugger:dumpTable(gameState))
 end
 
 
 local ai = sc2ai.new("172.19.64.1" , "5000" , "test" , 1)
 ai:createGame("AbyssalReefAIE.SC2Map", 2) 
+ai:getGameState()

@@ -3,7 +3,7 @@ local websocket = require "http.websocket"
 local pb = require "pb"
 local protoc = require "protoc"
 local debugger = require "src/debug"
-local timeout =  10
+local timeout = 60
 
 
 --!NOTE: src is need since this going to be running from root directory
@@ -80,18 +80,23 @@ function connection:send(request, requestType)
 	requestWrapper[requestType] = request
 
 	local protoRequest = assert(pb.encode("SC2APIProtocol.Request", requestWrapper))
-	self.client:send(protoRequest , 0x2, timeout) 
+	self.client:send(protoRequest , 0x2, timeout)
 
 	local pbResponseData= self.client:receive(timeout)
 	local responseTable= assert(pb.decode("SC2APIProtocol.Response", pbResponseData))
 
 	if responseTable.error ~= nil then 
 		print("sc2ai.connection: error in response")
-		print("error:"  , debugger:dumpTable(responseTable.error))
-		print("error details: " ,responseTable.error_details)
+		print(debugger:dumpTable(responseTable))
+		debugger:printStackTrace()
 		os.exit(1)
 	end
 	return responseTable
+end
+
+
+function connection:close()
+	self.client:close()
 end
 
 return connection
