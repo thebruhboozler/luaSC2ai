@@ -88,8 +88,7 @@ function connection:send(request, requestType)
 	if responseTable.error ~= nil then 
 		print("sc2ai.connection: error in response")
 		print(debugger:dumpTable(responseTable))
-		debugger:printStackTrace()
-		os.exit(1)
+		assert(false)
 	end
 	return responseTable
 end

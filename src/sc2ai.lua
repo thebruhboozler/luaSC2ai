@@ -1,8 +1,10 @@
 local pb = require("pb")
 local protoc = require("protoc")
-local connection = require("src/connection")
-local debugger = require("src/debug")
-local ids = require("src/ids/ids")
+local connection = require("src.connection")
+local debugger = require("src.debug")
+local ids = require("src.ids.ids")
+local actionManager = require("src.actionManager")
+
 
 local sc2ai = {}
 sc2ai.__index = sc2ai
@@ -95,7 +97,26 @@ function sc2ai:joinGame()
 end
 
 function generateComposition(unitTable) 
-	
+	local compTable = {}
+
+
+	local sortedTable = table.sort(unitTable, function(lUnit, rUnit)
+		return lUnit.tag > rUnit.tag
+		end)	
+
+	local lastTag = sortedTable[1].tag
+	local counter = 0
+	for i = 1,#sortedTable do
+		local currentTag = sortedTable[i].tag
+		if currentTag ~= lastTag then
+			table.insert(compTable, { tag = lastTag , count = counter } )
+			counter = 0
+			lastTag = currentTag
+		else
+			counter = counter +  1 
+		end
+	end
+	return compTable
 end
 
 function sc2ai:getGameState()
@@ -103,21 +124,44 @@ function sc2ai:getGameState()
 	self.minerals = gameState.player_common.minerals
 	self.vespine = gameState.player_common.vespine
 	
-	for _, unit in pairs(gameState.raw_data.units) do 
-		local tableToInsert
-		if unit.unit_type == ids.units.MINERALFIELD then
-			tableToInsert = self.mineralFields
-		elseif unit.alliance == "Neutral" then 
-			tableToInsert = self.miscEntities
-		elseif unit.alliance == "Self" then
-			tableToInsert = self.units
-		elseif unit.alliance == "Enemy" then 
-			tableToInsert = self.enemyUnits
+	for _, unit in pairs(gamestate.raw_data.units) do 
+		local tabletoinsert
+		if unit.unit_type == ids.units.mineralfield then
+			tabletoinsert = self.mineralfields
+		elseif unit.alliance == "neutral" then 
+			tabletoinsert = self.miscentities
+		elseif unit.alliance == "self" then
+			tabletoinsert = self.units
+		elseif unit.alliance == "enemy" then 
+			tabletoinsert = self.enemyunits
 		else
 			error("this type of unit hasn't been implemented yet!")
 		end
-		table.insert(tableToInsert , unit)
+		table.insert(tabletoinsert , unit)
 	end
+	self.unitComposition = generateComposition(self.units)
+	self.enemyUnitComposition = generateComposition(self.enemyUnits)
+end
+
+
+function sc2ai:findUnitByTag(unitTag , aliance)
+	
+	local searchTable
+
+	if aliance == nil or aliance == "self" then
+		searchTable = self.units	
+	elseif aliance == "Enemy" then
+		searchTable = self.enemyUnits
+	elseif aliance == "Neutral"
+		searchTable = self.miscEntities
+	end
+
+	for i=1,#searchTable do
+		if searchTable[i].tag == unitTag then
+			return searchTable[i]
+		end
+	end
+	return nil 
 end
 
 function sc2ai:orderMove(unitTag , orderTarget, queueOrder)
@@ -125,37 +169,66 @@ function sc2ai:orderMove(unitTag , orderTarget, queueOrder)
 		queueOrder = false
 	end
 
+	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 
-	local tagExists = false
-	for i = 1 , #self.units do
-		if self.units[i].tag == unitTag then 
-			tagExists = true
-			break
-		end
+	local moveOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.MOVE_MOVE)
+	local result = self.connection:send(moveOrderRequest,"action")
+	if result[1] ~= "Success" then
+		return result
 	end
-	assert(tagExists , "No unit found with tag of " .. unitTag)
+	return true
+end
 
-	local action = {
-		action_raw = {
-			unit_command = {
-				ability_id = ids.abilities.MOVE_MOVE,
-				unit_tags = {unitTag},
-				queue_command=queueOrder
-			}
-		}
-	}
-
-	if type(orderTarget) == "table" then
-		action.action_raw.unit_command.target_world_space_pos = orderTarget
-	elseif type(orderTarget) == "number" then 
-		action.action_raw.unit_command.target_unit_tag = orderTarget
-	else
-		error("orderTarget must be either an unit tag or a point in the world given as a table {x , y} ")
+function sc2ai:orderAttack(unitTag , orderTarget , queueOrder)
+	if queueOrder == nil then
+		queueOrder = false
 	end
 
-	local moveOrderRequest = {actions = {action}}
+	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 
-	debugger:dumpTable(self.connection:send(moveOrderRequest,"action"))
+	local attackOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.ATTACK_ATTACK)
+	local result = self.connection:send(attackOrderRequest , "action")
+	if result[1] ~= "Success" then
+		return result
+	end
+	return true
+end
+
+function sc2ai:orderBuild(unitTag , orderTarget , queueOrder , unitToBuildId)
+	if queueOrder == nil then
+		queueOrder = false
+	end
+
+	assert(self:findUnitByTag(unitTag, "self") ~= nil , "unable to find unit with tag of " .. unitTag)
+	assert(type(orderTarget) == "table" , "orderTarget must be a poisition in world space given as a table { x , y }")
+
+	local abilityId = actionManager:translateToAbilityId(unitToBuildId)
+	local buildOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, abilityId)
+	local result = self.connection:send(buildOrderRequest, "action")
+	if result[1] ~= "Success" then
+		return result
+	end
+	return true
+end
+
+function sc2ai:cancelBuild(unitTag)
+
+	local unit = self:findUnitByTag(unitTag)
+
+	assert(unit != nil , "unable to find unit with tag of " .. unitTag)
+
+	assert(unit.orders != "nil" , " the unitTag you have passed isn't performing any orders currrently")
+	local cancelBuildOrderRequest = actionManager:createRawAction(unitTag, unit.orders[1].target_world_space_pos, false , ids.abilites.CANCEL_BUILDINGINPROGRESS)
+
+	local result = self.connection:send(cancelBuildOrderRequest, "action")
+	if result[1] ~= "Success" then
+		return result
+	end
+	return true
+end
+
+function sc2ai:quitGame()
+	self.connection:send({}, "quit")
 end
 
 return sc2ai
