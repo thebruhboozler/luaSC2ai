@@ -3,7 +3,7 @@ local protoc = require("protoc")
 local connection = require("src.connection")
 local debugger = require("src.debug")
 local ids = require("src.ids.ids")
-local actionManager = require("src.actionManager")
+local actionHelper = require("src.actionHelper")
 
 
 local sc2ai = {}
@@ -27,12 +27,13 @@ function sc2ai.new(ip, port, name, race)
 	self.race = race
 
 	self.minerals = 0
-	self.vespine = 0
+	self.vespene = 0
 
 	self.units = {}
 	self.unitComposition = {}
 
 	self.mineralFields = {}
+	self.vespeneGeyser = {}
 
 	self.miscEntities = {}
 
@@ -99,15 +100,18 @@ end
 function generateComposition(unitTable) 
 	local compTable = {}
 
+	if #unitTable == 0 then 
+		return  compTable
+	end
 
-	local sortedTable = table.sort(unitTable, function(lUnit, rUnit)
+	table.sort(unitTable, function(lUnit, rUnit)
 		return lUnit.tag > rUnit.tag
-		end)	
+		end)
 
-	local lastTag = sortedTable[1].tag
+	local lastTag = unitTable[1].tag
 	local counter = 0
-	for i = 1,#sortedTable do
-		local currentTag = sortedTable[i].tag
+	for i = 1,#unitTable do
+		local currentTag = unitTable[i].tag
 		if currentTag ~= lastTag then
 			table.insert(compTable, { tag = lastTag , count = counter } )
 			counter = 0
@@ -116,24 +120,31 @@ function generateComposition(unitTable)
 			counter = counter +  1 
 		end
 	end
+
+	--add in the last unit tag
+	table.insert(compTable, { tag = lastTag , count = counter } )
+
 	return compTable
 end
 
 function sc2ai:getGameState()
 	local gameState = self.connection:send({}, "observation").observation.observation
 	self.minerals = gameState.player_common.minerals
-	self.vespine = gameState.player_common.vespine
-	
-	for _, unit in pairs(gamestate.raw_data.units) do 
+	self.vespene = gameState.player_common.vespene
+
+
+	for _, unit in pairs(gameState.raw_data.units) do 
 		local tabletoinsert
-		if unit.unit_type == ids.units.mineralfield then
-			tabletoinsert = self.mineralfields
-		elseif unit.alliance == "neutral" then 
-			tabletoinsert = self.miscentities
-		elseif unit.alliance == "self" then
+		if unit.unit_type == ids.units.MINERALFIELD then
+			tabletoinsert = self.mineralFields
+		elseif unit.unit_type == ids.units.VESPENEGEYSER then
+			tabletoinsert = self.vespeneGeyser
+		elseif unit.alliance == "Neutral" then 
+			tabletoinsert = self.miscEntities
+		elseif unit.alliance == "Self" then
 			tabletoinsert = self.units
-		elseif unit.alliance == "enemy" then 
-			tabletoinsert = self.enemyunits
+		elseif unit.alliance == "Enemy" then 
+			tabletoinsert = self.enemyUnits
 		else
 			error("this type of unit hasn't been implemented yet!")
 		end
@@ -152,7 +163,7 @@ function sc2ai:findUnitByTag(unitTag , aliance)
 		searchTable = self.units	
 	elseif aliance == "Enemy" then
 		searchTable = self.enemyUnits
-	elseif aliance == "Neutral"
+	elseif aliance == "Neutral" then
 		searchTable = self.miscEntities
 	end
 
@@ -169,9 +180,10 @@ function sc2ai:orderMove(unitTag , orderTarget, queueOrder)
 		queueOrder = false
 	end
 
+
 	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 
-	local moveOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.MOVE_MOVE)
+	local moveOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.MOVE_MOVE)
 	local result = self.connection:send(moveOrderRequest,"action")
 	if result[1] ~= "Success" then
 		return result
@@ -186,24 +198,25 @@ function sc2ai:orderAttack(unitTag , orderTarget , queueOrder)
 
 	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 
-	local attackOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.ATTACK_ATTACK)
+	local attackOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.ATTACK_ATTACK)
 	local result = self.connection:send(attackOrderRequest , "action")
+
 	if result[1] ~= "Success" then
 		return result
 	end
 	return true
 end
 
-function sc2ai:orderBuild(unitTag , orderTarget , queueOrder , unitToBuildId)
+function sc2ai:orderBuild(unitTag , orderTarget , unitToBuildId, queueOrder )
 	if queueOrder == nil then
 		queueOrder = false
 	end
 
-	assert(self:findUnitByTag(unitTag, "self") ~= nil , "unable to find unit with tag of " .. unitTag)
+	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 	assert(type(orderTarget) == "table" , "orderTarget must be a poisition in world space given as a table { x , y }")
 
-	local abilityId = actionManager:translateToAbilityId(unitToBuildId)
-	local buildOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, abilityId)
+	local abilityId = actionHelper:translateToAbilityId(unitToBuildId)
+	local buildOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, abilityId)
 	local result = self.connection:send(buildOrderRequest, "action")
 	if result[1] ~= "Success" then
 		return result
@@ -211,16 +224,31 @@ function sc2ai:orderBuild(unitTag , orderTarget , queueOrder , unitToBuildId)
 	return true
 end
 
-function sc2ai:cancelBuild(unitTag)
+function sc2ai:cancelOrder(unitTag)
 
 	local unit = self:findUnitByTag(unitTag)
 
-	assert(unit != nil , "unable to find unit with tag of " .. unitTag)
+	assert(unit ~= nil , "unable to find unit with tag of " .. unitTag)
 
-	assert(unit.orders != "nil" , " the unitTag you have passed isn't performing any orders currrently")
-	local cancelBuildOrderRequest = actionManager:createRawAction(unitTag, unit.orders[1].target_world_space_pos, false , ids.abilites.CANCEL_BUILDINGINPROGRESS)
+	assert(unit.orders ~= nil , " the unitTag you have passed isn't performing any orders currrently")
+	local cancelAction = actionHelper:getCancelAction(unit.orders[1])
+	local cancelBuildOrderRequest = actionHelper:createRawAction(unitTag, unit.orders[1].target_world_space_pos, false , cancelAction)
 
 	local result = self.connection:send(cancelBuildOrderRequest, "action")
+	if result[1] ~= "Success" then
+		return result
+	end
+	return true
+end
+
+function useSpecialAbility(unitTag ,abilityId , orderTarget) 
+
+	local unit = self:findUnitByTag(unitTag)
+
+	assert(unit ~= nil , "unable to find unit with tag of" .. unitTag)
+	
+	local useSpecialAbilityRequest = actionHelper:createRawAction(unitTag, orderTarget, false , abilityId)
+	local result = self.connection:send(useSpecialAbilityRequest)
 	if result[1] ~= "Success" then
 		return result
 	end

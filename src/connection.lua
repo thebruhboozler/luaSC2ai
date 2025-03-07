@@ -87,8 +87,12 @@ function connection:send(request, requestType)
 
 	if responseTable.error ~= nil then 
 		print("sc2ai.connection: error in response")
-		print(debugger:dumpTable(responseTable))
-		assert(false)
+		print("_______________________")
+		debugger:dumpTable(request)
+		print("_______________________")
+		debugger:dumpTable(responseTable)
+		print("_______________________")
+		error("error in response , possibly malformed request")
 	end
 	return responseTable
 end
