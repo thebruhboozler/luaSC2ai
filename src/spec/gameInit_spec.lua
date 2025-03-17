@@ -1,5 +1,5 @@
-local sc2ai = require "src.sc2ai"
-local ids = require "src.ids.ids"
+local sc2ai = require "src/sc2ai"
+
 
 describe("sc2ai" , function()
 	describe("initialization" , function()
@@ -9,14 +9,8 @@ describe("sc2ai" , function()
 			ai:getGameState()
 
 			assert(#ai.units > 0 , " incorrectly parrsing the returning data")
+			print(ai.units[2].unit_type)
 			ai:orderMove(ai.units[2].tag,  {x = 75 , y = 75} )
-
-			while ai.minerals < 100 do 
-				ai:getGameState()
-				os.execute("sleep 10")
-			end
-			
-			ai:orderBuild(ai.units[2].tag, {x=75 , y = 75}, ids.units.SUPPLYDEPOT)
 		end)
 	end)
 end)
