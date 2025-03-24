@@ -80,9 +80,9 @@ function connection:send(request, requestType)
 	requestWrapper[requestType] = request
 
 	local protoRequest = assert(pb.encode("SC2APIProtocol.Request", requestWrapper))
-	self.client:send(protoRequest , 0x2, timeout)
+	assert(self.client:send(protoRequest , 0x2, timeout))
 
-	local pbResponseData= self.client:receive(timeout)
+	local pbResponseData= assert(self.client:receive(timeout))
 	local responseTable= assert(pb.decode("SC2APIProtocol.Response", pbResponseData))
 
 	if responseTable.error ~= nil then 

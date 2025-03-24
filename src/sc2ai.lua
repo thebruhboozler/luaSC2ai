@@ -1,15 +1,24 @@
 local pb = require("pb")
 local protoc = require("protoc")
+local socket = require("socket")
 local connection = require("src.connection")
 local debugger = require("src.debug")
 local ids = require("src.ids.ids")
-local actionManager = require("src.actionManager")
-
+local actionHelper = require("src.actionHelper")
 
 local sc2ai = {}
 sc2ai.__index = sc2ai
 
-function sc2ai.new(ip, port, name, race)
+function sc2ai.new(name, race , ip, port)
+
+	if ip == nil then 
+		ip = assert(os.getenv("SC2IP") , "Error: Unable to determine IP! either pass the ip as string explicitly or set up SC2IP environment variable")
+	end
+
+	if port == nil then
+		port = assert(os.getenv("SC2PORT") , "Error: Unable to determine port! either pass the port as string explicitly or set up SC2PORT environment variable")
+	end
+
 	assert(
 		type(ip) == "string" and type(port) == "string" and type(name) == "string" and type(race) == "number",
 		"wrong type of arguement passed to "
@@ -27,12 +36,18 @@ function sc2ai.new(ip, port, name, race)
 	self.race = race
 
 	self.minerals = 0
-	self.vespine = 0
+	self.vespene = 0
+	self.supply=0
+	self.maxSupply=0
 
 	self.units = {}
 	self.unitComposition = {}
 
+	self.alliedUnits = {}
+	self.alliedUnitComposition = {}
+
 	self.mineralFields = {}
+	self.vespeneGeyser = {}
 
 	self.miscEntities = {}
 
@@ -96,18 +111,23 @@ function sc2ai:joinGame()
 	self.connection:send(joinGameRequest, "join_game")
 end
 
-function generateComposition(unitTable) 
+local function generateComposition(unitTable) 
+
+	assert(unitTable , "unit table to generate composition is null")
+
+	if #unitTable == 0 then 
+		return {}
+	end
 	local compTable = {}
 
-
-	local sortedTable = table.sort(unitTable, function(lUnit, rUnit)
+	table.sort(unitTable, function(lUnit, rUnit)
 		return lUnit.tag > rUnit.tag
-		end)	
+	end)	
 
-	local lastTag = sortedTable[1].tag
+	local lastTag = unitTable[1].tag
 	local counter = 0
-	for i = 1,#sortedTable do
-		local currentTag = sortedTable[i].tag
+	for i = 1,#unitTable do
+		local currentTag = unitTable[i].tag
 		if currentTag ~= lastTag then
 			table.insert(compTable, { tag = lastTag , count = counter } )
 			counter = 0
@@ -122,38 +142,66 @@ end
 function sc2ai:getGameState()
 	local gameState = self.connection:send({}, "observation").observation.observation
 	self.minerals = gameState.player_common.minerals
-	self.vespine = gameState.player_common.vespine
-	
-	for _, unit in pairs(gamestate.raw_data.units) do 
-		local tabletoinsert
-		if unit.unit_type == ids.units.mineralfield then
-			tabletoinsert = self.mineralfields
-		elseif unit.alliance == "neutral" then 
-			tabletoinsert = self.miscentities
-		elseif unit.alliance == "self" then
-			tabletoinsert = self.units
-		elseif unit.alliance == "enemy" then 
-			tabletoinsert = self.enemyunits
-		else
-			error("this type of unit hasn't been implemented yet!")
+	self.vespene = gameState.player_common.vespene
+	self.supply= gameState.player_common.food_used
+	self.maxSupply = gameState.player_common.food_cap
+
+	self.units = {}
+	self.enemyUnits = {}
+	self.mineralFields = {}
+	self.vespeneGeyser = {}
+	self.miscEntities = {}
+
+	local tmpTable
+
+	for _ , unit in pairs(gameState.raw_data.units) do 
+		if unit.alliance == "Self" then
+			tmpTable = self.units
+		elseif unit.alliance =="Enemy" then
+			tmpTable = self.enemyunits
+		elseif unit.unit_type == ids.units.MINERALFIELD then
+			tmpTable = self.mineralFields
+		elseif unit.unit_type == ids.units.VESPENEGEYSER then
+		 	tmpTable = self.vespeneGeyser
+		elseif unit.alliance == "Neutral" then
+			tmpTable = self.miscEntities
+		elseif unit.alliance == "Ally" then 
+			tmpTable = self.alliedUnits
+		else 
+			error("Error: unkown type of alliance!")
 		end
-		table.insert(tabletoinsert , unit)
+		table.insert(tmpTable, unit)
 	end
+	
 	self.unitComposition = generateComposition(self.units)
 	self.enemyUnitComposition = generateComposition(self.enemyUnits)
+	self.alliedUnitComposition = generateComposition(self.alliedUnits)
 end
 
 
-function sc2ai:findUnitByTag(unitTag , aliance)
+function sc2ai:findUnitByTag(unitTag , alliance)
 	
 	local searchTable
 
-	if aliance == nil or aliance == "self" then
+	local function concat(table1, table2)
+		local res = {}
+		for _,elem in pairs(table1) do
+			table.insert(res,elem)
+		end
+		for _,elem in pairs(table2) do
+			table.insert(res,elem)
+		end
+		return res
+	end
+
+	if alliance == nil or alliance == "self" then
 		searchTable = self.units	
-	elseif aliance == "Enemy" then
+	elseif alliance == "Enemy" then
 		searchTable = self.enemyUnits
-	elseif aliance == "Neutral"
+	elseif alliance == "Neutral" then
 		searchTable = self.miscEntities
+	elseif alliance == "any" then
+		searchTable = concat(concat(self.units, self.enemyUnits) , concat(self.mineralFields, self.miscEntities))
 	end
 
 	for i=1,#searchTable do
@@ -171,7 +219,7 @@ function sc2ai:orderMove(unitTag , orderTarget, queueOrder)
 
 	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 
-	local moveOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.MOVE_MOVE)
+	local moveOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.MOVE_MOVE)
 	local result = self.connection:send(moveOrderRequest,"action")
 	if result[1] ~= "Success" then
 		return result
@@ -186,7 +234,7 @@ function sc2ai:orderAttack(unitTag , orderTarget , queueOrder)
 
 	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 
-	local attackOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.ATTACK_ATTACK)
+	local attackOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.ATTACK_ATTACK)
 	local result = self.connection:send(attackOrderRequest , "action")
 	if result[1] ~= "Success" then
 		return result
@@ -194,7 +242,7 @@ function sc2ai:orderAttack(unitTag , orderTarget , queueOrder)
 	return true
 end
 
-function sc2ai:orderBuild(unitTag , orderTarget , queueOrder , unitToBuildId)
+function sc2ai:orderBuild(unitTag , orderTarget ,  unitToBuildId , queueOrder)
 	if queueOrder == nil then
 		queueOrder = false
 	end
@@ -202,8 +250,8 @@ function sc2ai:orderBuild(unitTag , orderTarget , queueOrder , unitToBuildId)
 	assert(self:findUnitByTag(unitTag, "self") ~= nil , "unable to find unit with tag of " .. unitTag)
 	assert(type(orderTarget) == "table" , "orderTarget must be a poisition in world space given as a table { x , y }")
 
-	local abilityId = actionManager:translateToAbilityId(unitToBuildId)
-	local buildOrderRequest = actionManager:createRawAction(unitTag, orderTarget, queueOrder, abilityId)
+	local abilityId = actionHelper:translateToAbilityId(unitToBuildId)
+	local buildOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, abilityId)
 	local result = self.connection:send(buildOrderRequest, "action")
 	if result[1] ~= "Success" then
 		return result
@@ -211,20 +259,77 @@ function sc2ai:orderBuild(unitTag , orderTarget , queueOrder , unitToBuildId)
 	return true
 end
 
-function sc2ai:cancelBuild(unitTag)
+function sc2ai:useSpecialAbility(unitTag ,abilityId , orderTarget) 
 
 	local unit = self:findUnitByTag(unitTag)
 
-	assert(unit != nil , "unable to find unit with tag of " .. unitTag)
-
-	assert(unit.orders != "nil" , " the unitTag you have passed isn't performing any orders currrently")
-	local cancelBuildOrderRequest = actionManager:createRawAction(unitTag, unit.orders[1].target_world_space_pos, false , ids.abilites.CANCEL_BUILDINGINPROGRESS)
-
-	local result = self.connection:send(cancelBuildOrderRequest, "action")
+	assert(unit ~= nil , "unable to find unit with tag of" .. unitTag)
+	
+	local useSpecialAbilityRequest = actionHelper:createRawAction(unitTag, orderTarget, false , abilityId)
+	local result = self.connection:send(useSpecialAbilityRequest, "action")
 	if result[1] ~= "Success" then
 		return result
 	end
 	return true
+end
+
+function sc2ai:Loop(callback)
+	local stepInterval = 1/22.4
+	while true do
+		local startTime = socket.gettime()
+		self:getGameState()
+		callback()
+		local duration = socket.gettime() - startTime
+		local timeTilNextStep = stepInterval - duration
+		if timeTilNextStep > 0 then 
+			socket.sleep(timeTilNextStep)
+		end
+	end
+end
+
+function sc2ai:findUnitbyType(unitType, alliance)
+	local searchTable 
+	if alliance == nil or alliance == "Self" then
+		searchTable = self.units
+	elseif alliance == "Enemy" then 
+		searchTable = self.enemyUnits
+	elseif alliance == "Neutral" then
+		searchTable = self.miscEntities 
+	else 
+		error("Unsupported alliance type")
+	end
+	for _,unit in pairs(searchTable) do 
+		if unitType == unit.unit_type then
+			return unit
+		end
+	end
+	return nil
+end
+
+
+function sc2ai:getAllUnitsOfType(unitType , alliance)
+	local searchTable 
+	if alliance == nil or alliance == "Self" then
+		searchTable = self.units
+	elseif alliance == "Enemy" then 
+		searchTable = self.enemyUnits
+	elseif alliance == "Neutral" then
+		searchTable = self.miscEntities 
+	else 
+		error("Unsupported alliance type")
+	end
+	local res = {}
+
+	for _, unit in pairs(searchTable) do
+		if unit.unit_type == unitType then 
+			table.insert(res , unit)
+		end
+	end
+
+	if #res >0 then 
+		return res 
+	end
+	return nil
 end
 
 function sc2ai:quitGame()
