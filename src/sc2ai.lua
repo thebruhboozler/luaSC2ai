@@ -111,6 +111,18 @@ function sc2ai:joinGame()
 	self.connection:send(joinGameRequest, "join_game")
 end
 
+local function parseAlliance(self,alliance)
+	if alliance == nil or alliance == "Self" then
+		return self.units
+	elseif alliance == "Enemy" then 
+		return self.enemyUnits
+	elseif alliance == "Neutral" then
+		return self.miscEntities 
+	else 
+		error("Unsupported alliance type")
+	end
+end
+
 local function generateComposition(unitTable) 
 
 	assert(unitTable , "unit table to generate composition is null")
@@ -160,8 +172,12 @@ function sc2ai:getGameState()
 		elseif unit.alliance =="Enemy" then
 			tmpTable = self.enemyunits
 		elseif unit.unit_type == ids.units.MINERALFIELD then
+			--!NOTE: since miscEntities is also for neutral I will insert them in there as well 
+			-- otherwise I'd have to make "VESPENEGEYSER" and "MINERALFIELD" a separate alliance and that doesn't make logical sense 
+			table.insert(self.miscEntities , unit)
 			tmpTable = self.mineralFields
 		elseif unit.unit_type == ids.units.VESPENEGEYSER then
+			table.insert(self.miscEntities , unit)
 		 	tmpTable = self.vespeneGeyser
 		elseif unit.alliance == "Neutral" then
 			tmpTable = self.miscEntities
@@ -221,7 +237,7 @@ function sc2ai:orderMove(unitTag , orderTarget, queueOrder)
 
 	local moveOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.MOVE_MOVE)
 	local result = self.connection:send(moveOrderRequest,"action")
-	if result[1] ~= "Success" then
+	if result.action.result[1] ~= "Success" then
 		return result
 	end
 	return true
@@ -236,7 +252,7 @@ function sc2ai:orderAttack(unitTag , orderTarget , queueOrder)
 
 	local attackOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, ids.abilities.ATTACK_ATTACK)
 	local result = self.connection:send(attackOrderRequest , "action")
-	if result[1] ~= "Success" then
+	if result.action.result[1] ~= "Success" then
 		return result
 	end
 	return true
@@ -248,13 +264,13 @@ function sc2ai:orderBuild(unitTag , orderTarget ,  unitToBuildId , queueOrder)
 	end
 
 	assert(self:findUnitByTag(unitTag, "self") ~= nil , "unable to find unit with tag of " .. unitTag)
-	assert(type(orderTarget) == "table" , "orderTarget must be a poisition in world space given as a table { x , y }")
+	assert(type(orderTarget) == "table" or type(orderTarget) == "number" , "orderTarget must either be an unit tag or a poisition in world space given as a table { x , y }")
 
 	local abilityId = actionHelper:translateToAbilityId(unitToBuildId)
 	local buildOrderRequest = actionHelper:createRawAction(unitTag, orderTarget, queueOrder, abilityId)
 	local result = self.connection:send(buildOrderRequest, "action")
-	if result[1] ~= "Success" then
-		return result
+	if result.action.result[1] ~= "Success" then
+		return result.action.result[1]
 	end
 	return true
 end
@@ -267,11 +283,30 @@ function sc2ai:useSpecialAbility(unitTag ,abilityId , orderTarget)
 	
 	local useSpecialAbilityRequest = actionHelper:createRawAction(unitTag, orderTarget, false , abilityId)
 	local result = self.connection:send(useSpecialAbilityRequest, "action")
-	if result[1] ~= "Success" then
+	if result.action.result[1] ~= "Success" then
 		return result
 	end
 	return true
 end
+
+function sc2ai:trainUnit(trainerTag , unitId)
+	local unit = self:findUnitByTag(trainerTag)
+	assert(unit ~= nil , "unable to find unit with tag of " .. trainerTag)
+	assert(unit.unit_type == ids.units.BARRACKS 
+		or unit.unit_type == ids.units.COMMANDCENTER
+		or unit.unit_type == ids.units.FACTORY
+		or unit.unit_type == ids.units.STARPORT,
+		"unit is not able to train")
+
+	local abilityId = actionHelper:translateToAbilityId(unitId)
+	local trainRequest = actionHelper:createRawAction(trainerTag, nil , true,abilityId)
+	local result = self.connection:send(trainRequest,"action")
+	if result.action.result[1] ~= "Success" then
+		return result
+	end
+	return true
+end
+
 
 function sc2ai:Loop(callback)
 	local stepInterval = 1/22.4
@@ -287,17 +322,8 @@ function sc2ai:Loop(callback)
 	end
 end
 
-function sc2ai:findUnitbyType(unitType, alliance)
-	local searchTable 
-	if alliance == nil or alliance == "Self" then
-		searchTable = self.units
-	elseif alliance == "Enemy" then 
-		searchTable = self.enemyUnits
-	elseif alliance == "Neutral" then
-		searchTable = self.miscEntities 
-	else 
-		error("Unsupported alliance type")
-	end
+function sc2ai:findUnitByType(unitType, alliance)
+	local searchTable = parseAlliance(self,alliance)
 	for _,unit in pairs(searchTable) do 
 		if unitType == unit.unit_type then
 			return unit
@@ -308,16 +334,7 @@ end
 
 
 function sc2ai:getAllUnitsOfType(unitType , alliance)
-	local searchTable 
-	if alliance == nil or alliance == "Self" then
-		searchTable = self.units
-	elseif alliance == "Enemy" then 
-		searchTable = self.enemyUnits
-	elseif alliance == "Neutral" then
-		searchTable = self.miscEntities 
-	else 
-		error("Unsupported alliance type")
-	end
+	local searchTable = parseAlliance(self,alliance)
 	local res = {}
 
 	for _, unit in pairs(searchTable) do
@@ -332,8 +349,37 @@ function sc2ai:getAllUnitsOfType(unitType , alliance)
 	return nil
 end
 
+function sc2ai:findNearestUnitOfType(target , unitType, alliance , targetAlliance)
+	if type(target) ~= "table" then 
+		local unit = self:findUnitByTag(target, targetAlliance)
+		target = {x = unit.pos.x , y = unit.pos.y}
+	end
+
+	local function getDist(x1,y1, x2,y2)
+		return math.sqrt((x1-x2) * (x1-x2) + (y1-y2)*(y1-y2))
+	end
+
+	local searchTable = parseAlliance(self,alliance)
+
+	local minUnit = nil
+	local minDist = math.huge
+	for _, unit in pairs(searchTable) do
+		if unit.unit_type == unitType then
+			local dist =getDist(target.x, target.y, unit.pos.x, unit.pos.y) 
+			if dist < minDist then
+				minDist = dist
+				minUnit = unit
+			end
+		end
+	end
+
+	return minUnit
+end
+
+
 function sc2ai:quitGame()
 	self.connection:send({}, "quit")
+
 end
 
 return sc2ai
