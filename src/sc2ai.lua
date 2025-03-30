@@ -53,7 +53,8 @@ function sc2ai.new(name, race , ip, port)
 
 	self.enemyUnits = {}
 	self.enemyUnitComposition = {}
-
+	
+	self.__state = nil
 	return self
 end
 
@@ -118,6 +119,8 @@ local function parseAlliance(self,alliance)
 		return self.enemyUnits
 	elseif alliance == "Neutral" then
 		return self.miscEntities 
+	elseif alliance == "Ally" then
+		return self.alliedUnits
 	else 
 		error("Unsupported alliance type")
 	end
@@ -152,6 +155,8 @@ local function generateComposition(unitTable)
 end
 
 function sc2ai:getGameState()
+
+
 	local gameState = self.connection:send({}, "observation").observation.observation
 	self.minerals = gameState.player_common.minerals
 	self.vespene = gameState.player_common.vespene
@@ -210,7 +215,7 @@ function sc2ai:findUnitByTag(unitTag , alliance)
 		return res
 	end
 
-	if alliance == nil or alliance == "self" then
+	if alliance == nil or alliance == "Self" then
 		searchTable = self.units	
 	elseif alliance == "Enemy" then
 		searchTable = self.enemyUnits
@@ -220,9 +225,9 @@ function sc2ai:findUnitByTag(unitTag , alliance)
 		searchTable = concat(concat(self.units, self.enemyUnits) , concat(self.mineralFields, self.miscEntities))
 	end
 
-	for i=1,#searchTable do
-		if searchTable[i].tag == unitTag then
-			return searchTable[i]
+	for _, unit in pairs(searchTable) do
+		if unit.tag == unitTag then 
+			return unit
 		end
 	end
 	return nil 
@@ -263,7 +268,7 @@ function sc2ai:orderBuild(unitTag , orderTarget ,  unitToBuildId , queueOrder)
 		queueOrder = false
 	end
 
-	assert(self:findUnitByTag(unitTag, "self") ~= nil , "unable to find unit with tag of " .. unitTag)
+	assert(self:findUnitByTag(unitTag) ~= nil , "unable to find unit with tag of " .. unitTag)
 	assert(type(orderTarget) == "table" or type(orderTarget) == "number" , "orderTarget must either be an unit tag or a poisition in world space given as a table { x , y }")
 
 	local abilityId = actionHelper:translateToAbilityId(unitToBuildId)
@@ -308,7 +313,10 @@ function sc2ai:trainUnit(trainerTag , unitId)
 end
 
 
+
 function sc2ai:Loop(callback)
+	--!FIXME: do this correctly 
+	socket.sleep(4)
 	local stepInterval = 1/22.4
 	while true do
 		local startTime = socket.gettime()
@@ -376,6 +384,33 @@ function sc2ai:findNearestUnitOfType(target , unitType, alliance , targetAllianc
 	return minUnit
 end
 
+
+function sc2ai:getIdleUnitsOfType(unitType)
+	local res = {}		
+	for _, unit in pairs(self.units) do
+		if unit.unit_type == unitType and unit.orders == nil then
+			table.insert(res, unit)
+		end
+	end
+	if #res > 0 then 
+		return res
+	end
+	return nil
+end
+
+
+function sc2ai:getIdleUnits()
+	local res = {}		
+	for _, unit in pairs(self.units) do
+		if #unit.orders == 0 then
+			table.insert(res, unit)
+		end
+	end
+	if #res > 0 then 
+		return res
+	end
+	return nil
+end
 
 function sc2ai:quitGame()
 	self.connection:send({}, "quit")

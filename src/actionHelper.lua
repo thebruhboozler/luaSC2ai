@@ -66,6 +66,8 @@ function actionHelper:translateToAbilityId(unitToBuildId)
 		return ids.abilities.STARPORTTRAIN_VIKINGFIGHTER 
 	elseif unitToBuildId == ids.units.LIBERATOR then 
 		return ids.abilities.STARPORTTRAIN_LIBERATOR 
+	elseif unitToBuildId == ids.units.SCV then 
+		return ids.abilities.COMMANDCENTERTRAIN_SCV
 	end
 end
 
