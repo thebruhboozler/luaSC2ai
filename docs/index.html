@@ -1,0 +1,650 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>lua sc2 ai </title>
+    <link rel="stylesheet" href="ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>Lua sc2 ai api</h1>
+
+
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Functions">Functions</a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><strong>sc2ai</strong></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>sc2ai</code></h1>
+<p>SC2AI MODULE</p>
+<p></p>
+
+
+<h2><a href="#Functions">Functions</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#new">new (name, race, ip, port)</a></td>
+	<td class="summary">creates sc2ai agent object</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#createGame">createGame (mapPath, enemyRace, autoJoin, disableFog, randomSeed, realtime)</a></td>
+	<td class="summary">tells starcraft 2 to create the match</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#joinGame">joinGame ()</a></td>
+	<td class="summary">joins game after creating it</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#getGameState">getGameState ()</a></td>
+	<td class="summary">gets the current state of the game (meaning number of resources and all visible units)</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#getUnitCount">getUnitCount (unitType, alliance)</a></td>
+	<td class="summary">gets the number of an units visible on the map of specific type</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#findUnitByTag">findUnitByTag (unitTag, alliance)</a></td>
+	<td class="summary">gets unit by tag</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#orderMove">orderMove (unitTag, orderTarget, queueOrder)</a></td>
+	<td class="summary">orders an unit to attack</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#orderAttack">orderAttack (unitTag, orderTarget, queueOrder)</a></td>
+	<td class="summary">orders an unit to attack</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#orderBuild">orderBuild (unitTag, orderTarget, unitToBuildId, queueOrder)</a></td>
+	<td class="summary">orders a worker to build a structure</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#useSpecialAbility">useSpecialAbility (unitTag, abilityId, orderTarget)</a></td>
+	<td class="summary">Uses special ability</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#trainUnit">trainUnit (trainerTag, unitId)</a></td>
+	<td class="summary">Trains an unit</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#Loop">Loop (callback)</a></td>
+	<td class="summary">main loop for running the behaviour of the agent</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#findUnitByType">findUnitByType (unitType, alliance)</a></td>
+	<td class="summary">finds a single unit</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#getAllUnitsOfType">getAllUnitsOfType (unitType, alliance)</a></td>
+	<td class="summary">gets all units of a type</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#findNearestUnitOfType">findNearestUnitOfType (target, unitType, alliance, targetAlliance)</a></td>
+	<td class="summary">finds the neartest unit of type from a point or an unit</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#getLeastOrderedUnitOfType">getLeastOrderedUnitOfType (unitType)</a></td>
+	<td class="summary">gets the unit with the lowest number of orders of a certain type</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#getIdleUnitsOfType">getIdleUnitsOfType (unitType)</a></td>
+	<td class="summary">gets all ide Units of a type</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#getIdleUnits">getIdleUnits ()</a></td>
+	<td class="summary">gets all ide Units</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#quitGame">quitGame ()</a></td>
+	<td class="summary">quits the game and forces starcraft 2 to shutdown</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header "><a name="Functions"></a>Functions</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "new"></a>
+    <strong>new (name, race, ip, port)</strong>
+    </dt>
+    <dd>
+    creates sc2ai agent object
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">name</span>
+         string name of the bot
+        </li>
+        <li><span class="parameter">race</span>
+         nmber race of the bot (1 for terran , 2 for zeg , 3 for protos and 4 for random)
+        </li>
+        <li><span class="parameter">ip</span>
+         ?string|nil ip where starcraft 2 expects the connection , if nil then it will use the environment varriable SC2IP
+        </li>
+        <li><span class="parameter">port</span>
+         ?string|nil port where starcraft 2 expects the connection  , if nil then it will use the environment varriable SC2PORT
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        table agent
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "createGame"></a>
+    <strong>createGame (mapPath, enemyRace, autoJoin, disableFog, randomSeed, realtime)</strong>
+    </dt>
+    <dd>
+    tells starcraft 2 to create the match
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">mapPath</span>
+         string path to the .SC2MAP file
+        </li>
+        <li><span class="parameter">enemyRace</span>
+         number race of the opponent ( 1 Terran , 2 Zerg  , 3 Protos , 4 random)
+        </li>
+        <li><span class="parameter">autoJoin</span>
+         ?boolean|nil  will automatically join the game upon the match being created , by default is equal to true
+        </li>
+        <li><span class="parameter">disableFog</span>
+         ?boolean|nil will disable fog , by default is equal to true
+        </li>
+        <li><span class="parameter">randomSeed</span>
+         ?number|nil the seed which starcraft 2 will use , if not passed starcraft 2 will use its own seed
+        </li>
+        <li><span class="parameter">realtime</span>
+         ?boolean|nil if the game should run in realtime or not (22.4 updates per second)
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "joinGame"></a>
+    <strong>joinGame ()</strong>
+    </dt>
+    <dd>
+    joins game after creating it
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "getGameState"></a>
+    <strong>getGameState ()</strong>
+    </dt>
+    <dd>
+    gets the current state of the game (meaning number of resources and all visible units)
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "getUnitCount"></a>
+    <strong>getUnitCount (unitType, alliance)</strong>
+    </dt>
+    <dd>
+    gets the number of an units visible on the map of specific type
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitType</span>
+         number id of the unit to get
+        </li>
+        <li><span class="parameter">alliance</span>
+         string the alliance of the unit "Self" for self, "Enemy" for enemies , "Ally" for allies and "Neutral" for neutral units (meaing mineral fields or barries on the map)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        number count the number of units found
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "findUnitByTag"></a>
+    <strong>findUnitByTag (unitTag, alliance)</strong>
+    </dt>
+    <dd>
+    gets unit by tag
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitTag</span>
+         number tag of the unit
+        </li>
+        <li><span class="parameter">alliance</span>
+         string the alliance of the unit "Self" for self, "Enemy" for enemies , "Ally" for allies and "Neutral" for neutral units (meaing mineral fields or barries on the map)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?table|nil unit the unit with the tag or nil if nothing is found
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "orderMove"></a>
+    <strong>orderMove (unitTag, orderTarget, queueOrder)</strong>
+    </dt>
+    <dd>
+    orders an unit to attack
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitTag</span>
+         number the tag of the unit which will be moving
+        </li>
+        <li><span class="parameter">orderTarget</span>
+         ?number|table the tag of the unit to be moved to or if passed as coordinates the place where to go
+        </li>
+        <li><span class="parameter">queueOrder</span>
+         ?boolean|nil queuing the order meaning doing the same thing as in base game holding shift and giving the order
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?boolean|string result of the action , if successful it will return true , otherwise it will return a string stating the reason for failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "orderAttack"></a>
+    <strong>orderAttack (unitTag, orderTarget, queueOrder)</strong>
+    </dt>
+    <dd>
+    orders an unit to attack
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitTag</span>
+         number the tag of the unit which will be attacking
+        </li>
+        <li><span class="parameter">orderTarget</span>
+         ?number|table the tag of the unit to be attacked or if passed as coordinates the place where to attack
+        </li>
+        <li><span class="parameter">queueOrder</span>
+         ?boolean|nil queuing the order meaning doing the same thing as in base game holding shift and giving the order
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?boolean|string result of the action , if successful it will return true , otherwise it will return a string stating the reason for failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "orderBuild"></a>
+    <strong>orderBuild (unitTag, orderTarget, unitToBuildId, queueOrder)</strong>
+    </dt>
+    <dd>
+    orders a worker to build a structure
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitTag</span>
+         number the tag of the unit which will build
+        </li>
+        <li><span class="parameter">orderTarget</span>
+         ?table|number tag of the unit on which the structure will be built, if passed as a coordinate table { x , y } the place where the building will be built
+        </li>
+        <li><span class="parameter">unitToBuildId</span>
+         number the id of the type of unit to be built
+        </li>
+        <li><span class="parameter">queueOrder</span>
+         ?boolean|nil queuing the order meaning doing the same thing as in base game holding shift and giving the order
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?boolean|string result of the action , if successful it will return true , otherwise it will return a string stating the reason for failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "useSpecialAbility"></a>
+    <strong>useSpecialAbility (unitTag, abilityId, orderTarget)</strong>
+    </dt>
+    <dd>
+    Uses special ability
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitTag</span>
+         number the tag of the unit using the ability
+        </li>
+        <li><span class="parameter">abilityId</span>
+         number the id of the ability that is to be used
+        </li>
+        <li><span class="parameter">orderTarget</span>
+         ?table|number tag of the unit on which the ability is to be used , if passed as a coordinate table { x , y } the place where the ability will be targeted
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?boolean|string result of the action , if successful it will return true , otherwise it will return a string stating the reason for failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "trainUnit"></a>
+    <strong>trainUnit (trainerTag, unitId)</strong>
+    </dt>
+    <dd>
+    Trains an unit
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">trainerTag</span>
+         number the tag of the trainer unit
+        </li>
+        <li><span class="parameter">unitId</span>
+         number the id of the type of unit which is to be trained
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?boolean|string result of the action , if successful it will return true , otherwise it will return a string stating the reason for failure
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "Loop"></a>
+    <strong>Loop (callback)</strong>
+    </dt>
+    <dd>
+    main loop for running the behaviour of the agent
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">callback</span>
+         function the callback function where the behaviour of the agent is defined
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "findUnitByType"></a>
+    <strong>findUnitByType (unitType, alliance)</strong>
+    </dt>
+    <dd>
+    finds a single unit
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitType</span>
+         number id of the unit type
+        </li>
+        <li><span class="parameter">alliance</span>
+         string the alliance of the unit being searched for "Self" for self, "Enemy" for enemies , "Ally" for allies and "Neutral" for neutral units (meaing mineral fields or barries on the map)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?table|nil unit a single unit of the type or nil if none are found
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "getAllUnitsOfType"></a>
+    <strong>getAllUnitsOfType (unitType, alliance)</strong>
+    </dt>
+    <dd>
+    gets all units of a type
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitType</span>
+         number id of the unit type
+        </li>
+        <li><span class="parameter">alliance</span>
+         string the alliance of the unit being searched for "Self" for self, "Enemy" for enemies , "Ally" for allies and "Neutral" for neutral units (meaing mineral fields or barries on the map)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?table|nil units a table of units of the type or nil if none are found
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "findNearestUnitOfType"></a>
+    <strong>findNearestUnitOfType (target, unitType, alliance, targetAlliance)</strong>
+    </dt>
+    <dd>
+    finds the neartest unit of type from a point or an unit
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">target</span>
+         ?table|number the coordinates { x , y } or a tag of an unit , if passed in as a tag it will use the units coordinatesand find the neartest to it
+        </li>
+        <li><span class="parameter">unitType</span>
+         number which type of an unit to find
+        </li>
+        <li><span class="parameter">alliance</span>
+         string the alliance of the unit being searched for "Self" for self, "Enemy" for enemies , "Ally" for allies and "Neutral" for neutral units (meaing mineral fields or barries on the map)
+        </li>
+        <li><span class="parameter">targetAlliance</span>
+         ?string|nil the alliance of the unit we are searching from , if the target is given as a table of coordinates then this parameter is ignored
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?table|nil the nearest unit found or nil if no unit found
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "getLeastOrderedUnitOfType"></a>
+    <strong>getLeastOrderedUnitOfType (unitType)</strong>
+    </dt>
+    <dd>
+    gets the unit with the lowest number of orders of a certain type
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitType</span>
+         number the type of the unit
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        table unit the unit with the lowest number of orders
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "getIdleUnitsOfType"></a>
+    <strong>getIdleUnitsOfType (unitType)</strong>
+    </dt>
+    <dd>
+    gets all ide Units of a type
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">unitType</span>
+         number the type of the unit
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?table|nil an array of all idle units , if no idle units exist it returns nil
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "getIdleUnits"></a>
+    <strong>getIdleUnits ()</strong>
+    </dt>
+    <dd>
+    gets all ide Units
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ?table|nil an array of all idle units , if no idle units exist it returns nil
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "quitGame"></a>
+    <strong>quitGame ()</strong>
+    </dt>
+    <dd>
+    quits the game and forces starcraft 2 to shutdown
+
+
+
+
+
+
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/lunarmodules/LDoc">LDoc 1.5.0</a></i>
+<i style="float:right;">Last updated 2025-03-31 16:58:42 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>
