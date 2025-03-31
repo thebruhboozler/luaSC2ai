@@ -136,26 +136,26 @@ local function generateComposition(unitTable)
 	local compTable = {}
 
 	table.sort(unitTable, function(lUnit, rUnit)
-		return lUnit.tag > rUnit.tag
+		return lUnit.unit_type> rUnit.unit_type
 	end)	
 
-	local lastTag = unitTable[1].tag
+	local lastType = unitTable[1].unit_type
 	local counter = 0
 	for i = 1,#unitTable do
-		local currentTag = unitTable[i].tag
-		if currentTag ~= lastTag then
-			table.insert(compTable, { tag = lastTag , count = counter } )
+		local currentType = unitTable[i].unit_type
+		if currentType ~= lastType then
+			table.insert(compTable, { type = lastType, count = counter } )
 			counter = 0
-			lastTag = currentTag
+			lastType = currentType
 		else
 			counter = counter +  1 
 		end
 	end
+	table.insert(compTable, { type = lastType, count = counter } )
 	return compTable
 end
 
 function sc2ai:getGameState()
-
 
 	local gameState = self.connection:send({}, "observation").observation.observation
 	self.minerals = gameState.player_common.minerals
@@ -175,7 +175,7 @@ function sc2ai:getGameState()
 		if unit.alliance == "Self" then
 			tmpTable = self.units
 		elseif unit.alliance =="Enemy" then
-			tmpTable = self.enemyunits
+			tmpTable = self.enemyUnits
 		elseif unit.unit_type == ids.units.MINERALFIELD then
 			--!NOTE: since miscEntities is also for neutral I will insert them in there as well 
 			-- otherwise I'd have to make "VESPENEGEYSER" and "MINERALFIELD" a separate alliance and that doesn't make logical sense 
@@ -199,6 +199,23 @@ function sc2ai:getGameState()
 	self.alliedUnitComposition = generateComposition(self.alliedUnits)
 end
 
+function sc2ai:getUnitCount(unitType , alliance)
+	local searchTable 
+	if alliance == nil or alliance == "Self" then
+		searchTable = self.unitComposition
+	elseif alliance == "Enemy" then
+		searchTable = self.enemyUnitComposition
+	elseif alliance == "Ally" then
+		searchTable = self.alliedUnitComposition
+	end
+
+	for _, unitComp in pairs(searchTable) do
+		if unitComp.type == unitType then 
+			return unitComp.count
+		end
+	end
+	return 0
+end
 
 function sc2ai:findUnitByTag(unitTag , alliance)
 	
@@ -232,6 +249,9 @@ function sc2ai:findUnitByTag(unitTag , alliance)
 	end
 	return nil 
 end
+
+
+
 
 function sc2ai:orderMove(unitTag , orderTarget, queueOrder)
 	if queueOrder == nil then
@@ -315,7 +335,7 @@ end
 
 
 function sc2ai:Loop(callback)
-	--!FIXME: do this correctly 
+	--!FIXME: do this correctly ! await the start of the game from start of countdown
 	socket.sleep(4)
 	local stepInterval = 1/22.4
 	while true do
@@ -384,6 +404,22 @@ function sc2ai:findNearestUnitOfType(target , unitType, alliance , targetAllianc
 	return minUnit
 end
 
+function sc2ai:getLeastOrderedUnitOfType(unitType)
+	local minUnit = nil
+	local minOrders = math.huge
+	for _, unit in pairs(self.units) do
+		if unit.unit_type == unitType then
+			if unit.orders == nil then 
+				return unit
+			end
+			if minOrders > #unit.orders then
+				minOrders = #unit.orders
+				minUnit = unit
+			end
+		end
+	end
+	return minUnit
+end
 
 function sc2ai:getIdleUnitsOfType(unitType)
 	local res = {}		
@@ -414,7 +450,6 @@ end
 
 function sc2ai:quitGame()
 	self.connection:send({}, "quit")
-
 end
 
 return sc2ai
