@@ -2,7 +2,8 @@ rockspec_format="3.0"
 package="luasc2ai"
 version="0.1-0"
 source = {
-	url = "..."
+	url = "https://github.com/thebruhboozler/luaSC2ai/releases/download/v0.1/luasc2ai-0_1.tar.gz",
+	tag="v0.1"
 }
 
 description = {
