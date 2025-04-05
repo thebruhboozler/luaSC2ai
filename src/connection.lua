@@ -52,7 +52,7 @@ end
 
 
 
-local schema = importProtoAsString( "./src/s2client-proto/s2clientprotocol/sc2api.proto")
+local schema = importProtoAsString( "src/s2client-proto/s2clientprotocol/sc2api.proto")
 local p = protoc.new()
 
 p:load(schema)

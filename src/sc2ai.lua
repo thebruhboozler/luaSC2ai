@@ -1,7 +1,5 @@
 ---SC2AI MODULE
 -- @module sc2ai 
-local pb = require("pb")
-local protoc = require("protoc")
 local socket = require("socket")
 local connection = require("src.connection")
 local debugger = require("src.debug")
