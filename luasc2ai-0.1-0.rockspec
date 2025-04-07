@@ -16,11 +16,11 @@ description = {
 }
 
 dependencies = {
-	"lua >= 5.1",
+	"lua = 5.1",
 	"http >= 0.4",
 	"lua-protobuf >=0.5",
 }
---FIXME: find a way to add in .proto files
+
 build = {
 	type = "builtin",
 	build_cmd="echo WOOOOOOOOOOOO",

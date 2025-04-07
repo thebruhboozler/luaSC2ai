@@ -7,7 +7,7 @@ describe("sc2ai" , function()
 	local ai 
 	setup(function()
 		math.randomseed(os.time())
-		os.execute("echo \"exit\" | nc " .. os.getenv("SC2IP") .. " " .. os.getenv("SC2LAUNCHPORT"))
+		sc2ai:launchSC2FromWsl() 
 		ai = sc2ai.new("test" , 1)
 		ai:createGame("AbyssalReefAIE.SC2Map", 2) --auto join is set to true by default
 	end)

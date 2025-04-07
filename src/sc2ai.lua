@@ -130,6 +130,25 @@ function sc2ai:joinGame()
 	self.connection:send(joinGameRequest, "join_game")
 end
 
+
+---launches starcraft 2 from wsl
+---@param port ?string|nil the port which was passed to sc2Runner.ps1 , if the port is nil it will use environment varriable SC2LAUNCHPORT
+---@param ip ?string|nil the ip which was passed to sc2Runner.ps1 , if the ip is nil it will use the environment varriable SC2IP
+function sc2ai:launchSC2FromWsl(port , ip ) 
+	if port == nil then 
+		port = os.getenv("SC2LAUNCHPORT")
+	end
+	if ip == nil then
+		ip = os.getenv("SC2IP")
+	end
+
+	local uri="http://"..ip..":"..port.."/"
+	local request = require("http.request")
+	local req = request.new_from_uri(uri)
+
+	req:go(10)
+end
+
 local function parseAlliance(self,alliance)
 	if alliance == nil or alliance == "Self" then
 		return self.units
