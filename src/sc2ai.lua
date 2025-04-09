@@ -558,6 +558,8 @@ function sc2ai:getIdleUnits()
 	return nil
 end
 
+
+---reqeust starcraft 2 to move to next step
 function sc2ai:step()
 	self.connection:send({}, "step")
 end
