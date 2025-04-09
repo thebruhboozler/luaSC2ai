@@ -105,6 +105,8 @@ function sc2ai:createGame(mapPath, enemyRace, autoJoin, disableFog, randomSeed, 
 			.. " randomSeed:number/nil "
 			.. " realtime: boolean/nil "
 	)
+	
+	self.realtime = realtime
 
 	local createGameRequest = {
 		local_map = { map_path = mapPath },
@@ -183,7 +185,7 @@ local function generateComposition(unitTable)
 		local currentType = unitTable[i].unit_type
 		if currentType ~= lastType then
 			table.insert(compTable, { type = lastType, count = counter } )
-			counter = 0
+			counter = 1
 			lastType = currentType
 		else
 			counter = counter +  1 
@@ -257,6 +259,24 @@ function sc2ai:getUnitCount(unitType , alliance)
 		end
 	end
 	return 0
+end
+
+
+---gets the number of units being trained/built at the 00:08
+---@param unitType number id of the unit to be found
+function sc2ai:getUnitInCreationCount(unitType)
+	local unitCreateOrderId = actionHelper:translateToAbilityId(unitType)
+	local trainingCount = 0
+	for _, unit in pairs(self.units) do 
+		if unit.orders ~= nil then
+			for _,order in pairs(unit.orders) do 
+				if order.ability_id == unitCreateOrderId then
+					trainingCount = trainingCount + 1
+				end
+			end
+		end
+	end
+	return trainingCount
 end
 
 ---gets unit by tag
@@ -414,7 +434,7 @@ function sc2ai:Loop(callback)
 		callback()
 		local duration = socket.gettime() - startTime
 		local timeTilNextStep = stepInterval - duration
-		if timeTilNextStep > 0 then 
+		if timeTilNextStep > 0 and self.realtime then 
 			socket.sleep(timeTilNextStep)
 		end
 	end
@@ -537,6 +557,11 @@ function sc2ai:getIdleUnits()
 	end
 	return nil
 end
+
+function sc2ai:step()
+	self.connection:send({}, "step")
+end
+
 ---quits the game and forces starcraft 2 to shutdown
 function sc2ai:quitGame()
 	self.connection:send({}, "quit")

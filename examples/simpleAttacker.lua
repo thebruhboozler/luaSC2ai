@@ -1,3 +1,10 @@
+--[[
+-- A simple attacker bot 
+-- then it trains 4 scvs 
+-- then it builds 5 barracks 
+-- and findally it trains 30 marines and orders them to attack
+--]]
+
 local sc2ai = require "src.sc2ai"
 local ids = require "src.ids.ids"
 local debugger = require "src.debug"
@@ -7,84 +14,82 @@ math.randomseed(os.time())
 local ai = sc2ai.new("SimpleAttacker" , 1)
 ai:createGame("AbyssalReefAIE.SC2Map", 1)
 
+local targetSCVs = 16
+local targetBarracks = 5
+local targetMarines = 30
 
-local trainingSCV = 0
-local targetScv = 16 
-local oldScvCount = 0
-local scvCount = 0
+local optimalSupplyGap = 5
 
+local attackLaunched = false
 
+function haveRandomUnitBuild(unit)
+	local scvs = ai:getAllUnitsOfType(ids.units.SCV)
+	local randSCV = scvs[math.random(#scvs)]
 
-local targetMarrines = 30
-local trainingMarines = 0
-local oldMarineCount = 0
-local marineCount = 0
-
-local x = 7
-local y = 7
-
-
-local attackLaunched = false 
-
+	local tries = 0
+	local result 
+	repeat
+		tries = tries + 1
+		local x = math.random(-15 , 15)
+		local y = math.random(-15 , 15)
+		result = ai:orderBuild(randSCV.tag, {x=commandCentre.pos.x+x ,y=commandCentre.pos.y+y}, unit,true)
+	until result ~= true and tries <= 5 
+end
 
 ai:Loop(function()
-	local commandCentre = ai:findUnitByType(ids.units.COMMANDCENTER)
-	oldScvCount = scvCount
-	scvCount = ai:getUnitCount(ids.units.SCV)
-	
-	
-	if ai:getUnitCount(ids.units.SUPPLYDEPOT) < 4 then
-		if ai.minerals < 100 then return end
-		local scv = ai:findUnitByType(ids.units.SCV)
-		ai:orderBuild(scv.tag, {x=commandCentre.pos.x+math.random(-5,5) ,y=commandCentre.pos.y+math.random(-5,5)}, ids.units.SUPPLYDEPOT)
-		return
-	end
-	
-	if scvCount-oldScvCount > 0 then
-		trainingSCV = trainingSCV - 1
-	end
 
-	if targetScv > scvCount+trainingSCV then 
-		if ai.minerals < 50 then return end
-		local result  = ai:trainUnit(commandCentre.tag, ids.units.SCV)
-		trainingSCV= trainingSCV+1
-		return
-	end
+	commandCentre = ai:findUnitByType(ids.units.COMMANDCENTER)
+	local idleScvs = ai:getIdleUnitsOfType(ids.units.SCV)
 
-	if ai:getUnitCount(ids.units.BARRACKS) < 3 then
-		if ai.minerals < 150 then return end
-		local scv = ai:findUnitByType(ids.units.SCV)
-		
-		local result = ai:orderBuild(scv.tag, {x=commandCentre.pos.x+x ,y=commandCentre.pos.y+y}, ids.units.BARRACKS,true)
-		while result ~= true do 
-			x = math.random(-15 , 15)
-			y = math.random(-15 , 15)
-			result = ai:orderBuild(scv.tag, {x=commandCentre.pos.x+x ,y=commandCentre.pos.y+y}, ids.units.BARRACKS,true)
+	if idleScvs ~= nil then 
+		for _, scv in pairs(idleScvs) do
+			local mineralField = ai:findNearestUnitOfType(commandCentre.tag, ids.units.MINERALFIELD, "Neutral", "Self")
+			ai:useSpecialAbility(scv.tag, ids.abilities.HARVEST_GATHER_SCV, mineralField.tag)
 		end
+	end
+
+
+	local depotBuildingInProgess = ai:getUnitInCreationCount(ids.units.SUPPLYDEPOT) > 0
+	
+
+	local freeSupply = ai.maxSupply - ai.supply
+
+	if freeSupply < optimalSupplyGap then
+		if ai.minerals > 100 and not depotBuildingInProgess then 
+			haveRandomUnitBuild(ids.units.SUPPLYDEPOT)
+			return
+		end
+	end
+
+
+	local scvCount = ai:getUnitCount(ids.units.SCV)
+	local scvTrainigCount = ai:getUnitInCreationCount(ids.units.SCV)
+
+	if (scvCount+scvTrainigCount < targetSCVs and ai.minerals >= 50) and (depotBuildingInProgess or freeSupply > 2 ) then
+		ai:trainUnit(commandCentre.tag , ids.units.SCV)
 		return
 	end
 
-	oldMarineCount = marineCount
-	marineCount = ai:getUnitCount(ids.units.MARINE)
-
-	if marineCount - oldMarineCount > 0 then
-		trainingMarines = trainingMarines - 1
+	local barracksCount = ai:getUnitCount(ids.units.BARRACKS) 
+	local barracksInCreation = ai:getUnitInCreationCount(ids.units.BARRACKS)
+	if barracksCount < targetBarracks and barracksInCreation < targetBarracks and ai.minerals > 150 then
+		haveRandomUnitBuild(ids.units.BARRACKS)	
+		return
 	end
 
+	if barracksCount > 0 then
+		optimalSupplyGap = 10
+	end
 
-	--!FIXME:implement proper counting
-	if marineCount + trainingMarines < targetMarrines + 5  then 
-		if ai.minerals < 50 then return end
+	local marineCount = ai:getUnitCount(ids.units.MARINE)
+	local marineTrainingCount = ai:getUnitInCreationCount(ids.units.MARINE)
+	if marineCount + marineTrainingCount < targetMarines and ai.minerals >= 50 and barracksCount > 0 and (depotBuildingInProgess or freeSupply > 8 ) then
 		local barracks = ai:getLeastOrderedUnitOfType(ids.units.BARRACKS)
-		if barracks.build_progress ~= 1 then return end
-		local result = ai:trainUnit(barracks.tag, ids.units.MARINE)
-		if result == true  then trainingMarines = trainingMarines + 1 end
-		print("MarineCount " , marineCount , " training Count " , trainingMarines)
+		ai:trainUnit(barracks.tag , ids.units.MARINE)
 		return 
 	end
 
-	if marineCount == targetMarrines and not attackLaunched then 
-		print("Launching attack")
+	if marineCount == targetMarines and not attackLaunched then
 		attackLaunched = true
 		local marines = ai:getAllUnitsOfType(ids.units.MARINE)
 
@@ -98,14 +103,5 @@ ai:Loop(function()
 			ai:orderAttack(marine.tag,attackPoint)
 		end
 		return 
-	end
-
-	local idleScvs = ai:getIdleUnitsOfType(ids.units.SCV)
-
-	if idleScvs ~= nil then 
-		for _, scv in pairs(idleScvs) do
-			local mineralField = ai:findNearestUnitOfType(commandCentre.tag, ids.units.MINERALFIELD, "Neutral", "Self")
-			ai:useSpecialAbility(scv.tag, ids.abilities.HARVEST_GATHER_SCV, mineralField.tag)
-		end
 	end
 end)

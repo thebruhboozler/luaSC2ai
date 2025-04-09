@@ -3,8 +3,6 @@ local ids = require("src.ids.ids")
 local actionHelper = {}
 actionHelper.__index=actionHelper
 
-
-
 function actionHelper:translateToAbilityId(unitToBuildId)
 	assert(type(unitToBuildId) == "number" , "unit to build must be an id")
 
