@@ -262,7 +262,7 @@ function sc2ai:getUnitCount(unitType , alliance)
 end
 
 
----gets the number of units being trained/built at the 00:08
+---gets the number of units being trained/built at the time 
 ---@param unitType number id of the unit to be found
 function sc2ai:getUnitInCreationCount(unitType)
 	local unitCreateOrderId = actionHelper:translateToAbilityId(unitType)
