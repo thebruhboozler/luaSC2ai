@@ -23,7 +23,6 @@ dependencies = {
 
 build = {
 	type = "builtin",
-	build_cmd="echo WOOOOOOOOOOOO",
 	modules = {
 		luaSC2ai = "src/sc2ai.lua",
 		["src.actionHelper"]="src/actionHelper.lua",
